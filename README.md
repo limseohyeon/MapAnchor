@@ -1,8 +1,60 @@
-# DWG 지도 업로드
+# MapAnchor
 
-DWG 파일을 브라우저에서 FastAPI로 직접 전송하고 로컬 파일시스템에 저장합니다. 별도 데이터베이스를 사용하지 않습니다.
+> CAD 도면(DWG/DXF)을 브라우저에서 열고, **주소로 위치를 찍어** 도면 좌표에 연결하는 로컬 웹 앱
 
-## 저장 구조
+데이터베이스 없이 로컬 파일만 사용합니다. Windows PC에서 실행하는 것을 기준으로 합니다.
+
+---
+
+## 무엇을 하나요?
+
+```text
+도면 업로드  →  DXF 변환·표시  →  주소 검색  →  도면 위 마커
+```
+
+| 단계 | 설명 |
+|:----:|------|
+| 1️⃣ | `.dwg` / `.dxf` 업로드 |
+| 2️⃣ | 브라우저에서 도면 열람 (줌·좌표계·단위) |
+| 3️⃣ | 카카오 주소 검색 → 도면 좌표로 변환 |
+| 4️⃣ | 도면 범위 안이면 세션 마커 표시 |
+
+---
+
+## 주요 기능
+
+| | 기능 | 비고 |
+|---|------|------|
+| 📂 | 도면 업로드·목록·삭제 | SHA-256 중복 판별 |
+| 🔄 | DWG → DXF 자동 변환 | [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter) 필요 |
+| 🗺️ | 브라우저 DXF 뷰어 | Three.js / dxf-viewer |
+| 📍 | 주소 → 도면 마커 | 카카오 Local API |
+| 🧭 | 한국 좌표계 | `EPSG:5179` 등 Korea 2000 계열 |
+| 📏 | 도면 단위 | m(×1) / mm(×1000), 자동·수동 |
+
+---
+
+## 구성
+
+```text
+┌─────────────┐     ┌─────────────┐     ┌──────────────┐
+│  Streamlit  │────▶│   FastAPI   │────▶│  로컬 저장소  │
+│  :8501      │     │   :8000     │     │  data/…      │
+└─────────────┘     └─────────────┘     └──────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │ ODA / 카카오 │
+                    └─────────────┘
+```
+
+| 경로 | 역할 |
+|------|------|
+| `frontend/` | UI · DXF 뷰어 |
+| `backend/` | 업로드 · 변환 · 좌표 · 주소 API |
+| `data/drawings/` | 도면·메타데이터 (DB 대체) |
+| `docs/` | 설치·사용 매뉴얼 |
+
+**저장 구조**
 
 ```text
 data/drawings/{sha256}/
@@ -12,72 +64,60 @@ data/drawings/{sha256}/
 └─ metadata.json
 ```
 
-업로드 파일은 기본 8MB 청크로 저장되며 저장 과정에서 SHA-256을 계산합니다. 애플리케이션 차원의 파일 크기 상한은 없고 디스크의 최소 여유 공간만 확인합니다.
+---
 
-## 사용자 매뉴얼
+## 빠른 시작
 
-다른 PC에서 처음 설치·실행하는 방법은 **[docs/사용자_매뉴얼.md](docs/사용자_매뉴얼.md)** 를 따라 하세요.  
-Python·ODA File Converter·카카오 API 키 설정, 실행, 문제 해결이 순서대로 정리되어 있습니다.
-
-## 설치 및 실행
+> 처음 설치·카카오 키·ODA 설정은 **[사용자 매뉴얼](docs/사용자_매뉴얼.md)** 을 따르세요.
 
 ```powershell
-python -m venv C:\venvs\dwg-map
-C:\venvs\dwg-map\Scripts\python.exe -m pip install -r requirements.txt
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-프로젝트 폴더에 `.venv`를 만들어도 됩니다. (`docs/사용자_매뉴얼.md` 참고)
-
-### 더블클릭 실행
-
-프로젝트 루트의 `run_app.bat`을 더블클릭하면 백엔드와 프론트가 함께 뜨고 브라우저가 열립니다.
-
-또는 PowerShell에서:
-
-```powershell
-.\scripts\run_app.ps1
-```
-
-개별 실행이 필요하면:
-
-```powershell
-.\scripts\run_backend.ps1
-.\scripts\run_frontend.ps1
-```
-
-- API: `http://127.0.0.1:8000`
-- API 문서: `http://127.0.0.1:8000/docs`
-- Streamlit: `http://localhost:8501`
-
-Python 경로가 다른 경우 `DWG_MAP_PYTHON` 환경 변수에 가상환경의 `python.exe` 경로를 지정합니다.
-
-DWG → DXF 변환에는 PC에 [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter)가 설치되어 있어야 합니다. 없으면 업로드는 되지만 변환은 `blocked`가 됩니다.
-
-주소 검색에는 카카오 REST API 키가 필요합니다. 프로젝트 폴더의 `.env`에 적어두면 백엔드가 작업 디렉터리 기준 상대경로(`.env`)로 읽어 환경변수로 올립니다. `run_app.ps1`은 프로젝트 루트에서 실행합니다.
-
-1. `.env.example`을 복사해 `.env`를 만들거나, 이미 있는 `.env`를 엽니다.
-2. 아래처럼 REST API 키를 넣습니다.
+`.env.example` → `.env` 복사 후 키 설정:
 
 ```text
 KAKAO_REST_API_KEY=발급받은_REST_API_키
 ```
 
-3. 백엔드를 다시 시작합니다.
+실행:
 
-PowerShell에서 직접 넣을 수도 있습니다. 이미 설정된 환경변수가 있으면 `.env` 값보다 우선합니다.
-
-```powershell
-$env:KAKAO_REST_API_KEY = "발급받은_REST_API_키"
+```text
+run_app.bat          # 더블클릭
+# 또는
+.\scripts\run_app.ps1
 ```
 
-키가 없으면 주소 검색 API는 `address_api_not_configured`로 실패합니다. `.env`는 Git에 올리지 마세요.
+| | URL |
+|---|-----|
+| 🖥️ UI | http://localhost:8501 |
+| 🔌 API | http://127.0.0.1:8000 |
+| 📘 Docs | http://127.0.0.1:8000/docs |
 
-## 현재 범위
+---
 
-- DWG/DXF 업로드 검증 및 로컬 저장
-- SHA-256 중복 판별, `metadata.json` 원자적 기록
-- ODA File Converter를 통한 DWG → DXF 변환(미설치 시 `blocked`)
-- 도면 미리보기, 주소 검색, 좌표계 변환, 세션 마커
+## 알아두면 좋은 점
 
-자세한 설치·사용은 `docs/사용자_매뉴얼.md`를 보세요.
-# MapAnchor
+- ☁️ 클라우드·멀티유저·인증 없음 — **로컬 전용**
+- 💾 마커는 **세션 한정** (영구 저장하지 않음)
+- 🧱 DWG는 ODA 미설치 시 변환이 `blocked`
+- 🔑 주소 검색은 카카오 REST API 키 필요 (`.env`는 Git에 올리지 마세요)
+
+자세한 문제 해결은 [사용자 매뉴얼](docs/사용자_매뉴얼.md)을 참고하세요.
+
+---
+
+## 📜 라이선스
+
+Copyright © 2026 seohyeon. All Rights Reserved.
+
+본 저장소의 소스코드는 **열람(공개) 목적**으로 제공됩니다.  
+저작권자의 **사전 서면 허가 없이** 아래 행위를 금합니다.
+
+- 복제, 수정, 배포
+- 상업적·비상업적 이용
+- 2차 저작물(파생작) 제작
+- Fork 후 재배포
+
+문의·사용 허가가 필요하면 저장소 소유자에게 직접 연락하세요.

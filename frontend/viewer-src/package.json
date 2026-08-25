@@ -1,0 +1,18 @@
+{
+  "name": "viewer-src",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --format=iife --outfile=../static/dxf-viewer.bundle.js --minify"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dxf-viewer": "^1.0.48",
+    "esbuild": "^0.28.2",
+    "three": "^0.161.0"
+  }
+}
